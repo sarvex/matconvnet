@@ -26,10 +26,7 @@ from layers import *
 # --------------------------------------------------------------------
 
 def find(seq, name):
-  for item in seq:
-    if item.name == name:
-      return item
-  return None
+  return next((item for item in seq if item.name == name), None)
 
 def blobproto_to_array(blob):
   return np.array(blob.data,dtype='float32').reshape(
@@ -216,13 +213,7 @@ def bilinear_interpolate(im, x, y):
 
 # Get the parameters for a layer from Caffe's proto entries
 def getopts(layer, name):
-  if hasattr(layer, name):
-    return getattr(layer, name)
-  else:
-    # Older Caffe proto formats did not have sub-structures for layer
-    # specific parameters but mixed everything up! This falls back to
-    # that situation when fetching the parameters.
-    return layer
+  return getattr(layer, name) if hasattr(layer, name) else layer
 
 # --------------------------------------------------------------------
 #                                                   Load average image

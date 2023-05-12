@@ -12,39 +12,40 @@ import scipy.misc
 import copy
 import collections
 
-layers_type = {}
-layers_type[0]  = 'none'
-layers_type[1]  = 'accuracy'
-layers_type[2]  = 'bnll'
-layers_type[3]  = 'concat'
-layers_type[4]  = 'conv'
-layers_type[5]  = 'data'
-layers_type[6]  = 'dropout'
-layers_type[7]  = 'euclidean_loss'
-layers_type[8]  = 'flatten'
-layers_type[9]  = 'hdf5_data'
-layers_type[10] = 'hdf5_output'
-layers_type[28] = 'hinge_loss'
-layers_type[11] = 'im2col'
-layers_type[12] = 'image_data'
-layers_type[13] = 'infogain_loss'
-layers_type[14] = 'inner_product'
-layers_type[15] = 'lrn'
-layers_type[25] = 'eltwise'
-layers_type[29] = 'memory_data'
-layers_type[16] = 'multinomial_logistic_loss'
-layers_type[17] = 'pool'
-layers_type[26] = 'power'
-layers_type[18] = 'relu'
-layers_type[19] = 'sigmoid'
-layers_type[27] = 'sigmoid_cross_entropy_loss'
-layers_type[20] = 'softmax'
-layers_type[21] = 'softmax_loss'
-layers_type[22] = 'split'
-layers_type[23] = 'tanh'
-layers_type[24] = 'window_data'
-layers_type[39] = 'deconvolution'
-layers_type[40] = 'crop'
+layers_type = {
+    0: 'none',
+    1: 'accuracy',
+    2: 'bnll',
+    3: 'concat',
+    4: 'conv',
+    5: 'data',
+    6: 'dropout',
+    7: 'euclidean_loss',
+    8: 'flatten',
+    9: 'hdf5_data',
+    10: 'hdf5_output',
+    28: 'hinge_loss',
+    11: 'im2col',
+    12: 'image_data',
+    13: 'infogain_loss',
+    14: 'inner_product',
+    15: 'lrn',
+    25: 'eltwise',
+    29: 'memory_data',
+    16: 'multinomial_logistic_loss',
+    17: 'pool',
+    26: 'power',
+    18: 'relu',
+    19: 'sigmoid',
+    27: 'sigmoid_cross_entropy_loss',
+    20: 'softmax',
+    21: 'softmax_loss',
+    22: 'split',
+    23: 'tanh',
+    24: 'window_data',
+    39: 'deconvolution',
+    40: 'crop',
+}
 
 def getFilterOutputSize(size, kernelSize, stride, pad):
     return [floor((size[0] + pad[0]+pad[1] - kernelSize[0]) / stride[0]) + 1., \
@@ -125,7 +126,7 @@ class CaffeTransform(object):
         self.offset = offset
 
     def __str__(self):
-        return "<%s %s %s>" % (self.size, self.stride, self.offset)
+        return f"<{self.size} {self.stride} {self.offset}>"
 
 def composeTransforms(a, b):
     size = [0.,0.]
@@ -135,8 +136,7 @@ def composeTransforms(a, b):
         size[i] = a.stride[i] * (b.size[i] - 1) + a.size[i]
         stride[i] = a.stride[i] * b.stride[i]
         offset[i] = a.stride[i] * (b.offset[i] - 1) + a.offset[i]
-    c = CaffeTransform(size, stride, offset)
-    return c
+    return CaffeTransform(size, stride, offset)
 
 def transposeTransform(a):
     size = [0.,0.]
@@ -146,8 +146,7 @@ def transposeTransform(a):
         size[i] = (a.size[i] + a.stride[i] - 1.0) / a.stride[i]
         stride[i] = 1.0/a.stride[i]
         offset[i] = (1.0 + a.stride[i] - a.offset[i]) / a.stride[i]
-    c = CaffeTransform(size, stride, offset)
-    return c
+    return CaffeTransform(size, stride, offset)
 
 # --------------------------------------------------------------------
 #                                                               Errors
@@ -183,10 +182,11 @@ class CaffeLayer(object):
 
     def getTransforms(self, model):
         transforms = []
-        for i in enumerate(self.inputs):
-            row = []
-            for j in enumerate(self.outputs):
-                row.append(CaffeTransform([1.,1.], [1.,1.], [1.,1.]))
+        for _ in enumerate(self.inputs):
+            row = [
+                CaffeTransform([1.0, 1.0], [1.0, 1.0], [1.0, 1.0])
+                for _ in enumerate(self.outputs)
+            ]
             transforms.append(row)
         return transforms
 
@@ -222,15 +222,14 @@ class CaffeReLU(CaffeElementWise):
     def toMatlab(self):
         mlayer = super(CaffeReLU, self).toMatlab()
         mlayer['type'][0] = u'dagnn.ReLU'
-        mlayer['block'][0] = dictToMatlabStruct(
-            {'leak': float(0.0) })
+        mlayer['block'][0] = dictToMatlabStruct({'leak': 0.0})
         # todo: leak factor
         return mlayer
 
     def toMatlabSimpleNN(self):
         mlayer = super(CaffeReLU, self).toMatlabSimpleNN()
         mlayer['type'] = u'relu'
-        mlayer['leak'] = float(0.0)
+        mlayer['leak'] = 0.0
         return mlayer
 
 class CaffeLRN(CaffeElementWise):
@@ -316,8 +315,9 @@ class CaffeDropout(CaffeElementWise):
 class CaffeConv(CaffeLayer):
     def __init__(self, name, inputs, outputs, kernelSize, hasBias, numFilters, numFilterGroups, stride, pad):
         super(CaffeConv, self).__init__(name, inputs, outputs)
-        self.params = [name + 'f']
-        if hasBias: self.params.append(name + 'b')
+        self.params = [f'{name}f']
+        if hasBias:
+            self.params.append(f'{name}b')
         self.hasBias = hasBias
         self.kernelSize = kernelSize
         self.numFilters = numFilters
@@ -340,9 +340,9 @@ class CaffeConv(CaffeLayer):
         varin = model.vars[self.inputs[0]]
         varout = model.vars[self.outputs[0]]
         if len(varin.size) == 0: return
-        varout.size = getFilterOutputSize(varin.size[0:2], \
-                                              self.kernelSize, self.stride, self.pad) + \
-                                              [self.numFilters, varin.size[3]]
+        varout.size = getFilterOutputSize(
+            varin.size[:2], self.kernelSize, self.stride, self.pad
+        ) + [self.numFilters, varin.size[3]]
         self.filterDimension = varin.size[2] / self.numFilterGroups
 
     def getTransforms(self, model):
@@ -423,10 +423,12 @@ class CaffeDeconvolution(CaffeConv):
 
     def reshape(self, model):
         if len(model.vars[self.inputs[0]].size) == 0: return
-        model.vars[self.outputs[0]].size = \
-            getFilterOutputSize(model.vars[self.inputs[0]].size[0:2],
-                                self.kernelSize, self.stride, self.pad) + \
-            [self.numFilters, model.vars[self.inputs[0]].size[3]]
+        model.vars[self.outputs[0]].size = getFilterOutputSize(
+            model.vars[self.inputs[0]].size[:2],
+            self.kernelSize,
+            self.stride,
+            self.pad,
+        ) + [self.numFilters, model.vars[self.inputs[0]].size[3]]
         self.filterDimension = model.vars[self.inputs[0]].size[2]
 
     def getTransforms(self, model):
@@ -504,9 +506,10 @@ class CaffePooling(CaffeLayer):
             self.padCorrected[1 + i*2] = min(
                 self.pad[1 + i*2] + self.stride[i] - 1,
                 self.kernelSize[i] - 1)
-        model.vars[self.outputs[0]].size = \
-            getFilterOutputSize(size[0:2], ks, self.stride, self.padCorrected) + \
-            size[2:5]
+        model.vars[self.outputs[0]].size = (
+            getFilterOutputSize(size[:2], ks, self.stride, self.padCorrected)
+            + size[2:5]
+        )
 
     def getTransforms(self, model):
         return [[getFilterTransform(self.kernelSize, self.stride, self.pad)]]
@@ -726,10 +729,7 @@ class CaffeModel(object):
 
     def renameVar(self, old, new, afterLayer=None):
         self.vars[old].name = new
-        if afterLayer is not None:
-            start = self.layers.keys().index(afterLayer) + 1
-        else:
-            start = 0
+        start = 0 if afterLayer is None else self.layers.keys().index(afterLayer) + 1
         # fix all references to the variable
         for layer in self.layers.values()[start:-1]:
             layer.inputs = [new if x==old else x for x in layer.inputs]
@@ -784,7 +784,7 @@ class CaffeModel(object):
             layerIndex = len(self.layers) + 1
         transforms = OrderedDict()
         transforms[variableName] = CaffeTransform([1.,1.], [1.,1.], [1.,1.])
-        for layerName in reversed(layerNames[0:layerIndex]):
+        for layerName in reversed(layerNames[:layerIndex]):
             layer = self.layers[layerName]
             layerTfs = layer.getTransforms(self)
             for i, inputName in enumerate(layer.inputs):
@@ -797,7 +797,7 @@ class CaffeModel(object):
                         composed = composeTransforms(layerTfs[i][j], transforms[outputName])
                         tfs.append(composed)
 
-                if len(tfs) > 0:
+                if tfs:
                     # should resolve conflicts, not simply pick the first tf
                     transforms[inputName] = tfs[0]
         return transforms

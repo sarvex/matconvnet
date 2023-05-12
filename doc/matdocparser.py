@@ -72,9 +72,8 @@ class Symbol(object):
         return isinstance(self, classinfo) and \
             (indent is None or self.indent == indent)
     def __str__(self, indent = 0):
-        if self.indent is not None: x = "%d" % self.indent
-        else: x = "*"
-        return " "*indent + "%s(%s)" % (self.__class__.__name__, x)
+        x = "%d" % self.indent if self.indent is not None else "*"
+        return " "*indent + f"{self.__class__.__name__}({x})"
 
 # Terminal symbols
 # Note that PL, BH, DH are all subclasses of L; the fields .text and .indent
@@ -85,7 +84,7 @@ class B (Terminal): pass # blank linke
 class L (Terminal): # non-empty line: '<" "*indent><text>'
     text = ""
     def __str__(self, indent = 0):
-        return "%s: %s" % (super(L, self).__str__(indent), self.text)
+        return f"{super(L, self).__str__(indent)}: {self.text}"
 class PL (L): pass # regular line
 class BH (L): # bullet: a line of type '  * <inner_text>'
     inner_indent = None
@@ -95,13 +94,12 @@ class DH (L):  # description: a line of type ' <description>::<inner_text>'
     inner_text = None
     description = None
     def __str__(self, indent = 0):
-        return "%s: '%s' :: '%s'" % (super(L, self).__str__(indent),
-                           self.description, self.inner_text)
+        return f"{super(L, self).__str__(indent)}: '{self.description}' :: '{self.inner_text}'"
 class SL (L): # section: '<#+><text>'
     section_level = 0
     inner_text = None
     def __str__(self, indent = 0):
-        return "%s: %s" % (super(L, self).__str__(indent), self.inner_text)
+        return f"{super(L, self).__str__(indent)}: {self.inner_text}"
 
 # A lexer object: parse lines of the input document into terminal symbols
 class Lexer(object):
@@ -113,47 +111,36 @@ class Lexer(object):
         self.pos = self.pos + 1
         # no more
         if self.pos > len(self.lines)-1:
-            x = EOF()
-            return x
+            return EOF()
         line = self.lines[self.pos]
-        # a blank line
-        match = re.match(r"\s*\n?$", line) ;
-        if match:
+        if match := re.match(r"\s*\n?$", line):
             return B()
-        # a line of type '  <#+><inner_text>'
-        match = re.match(r"(\s*)(#+)(.*)\n?$", line)
-        if match:
+        if match := re.match(r"(\s*)(#+)(.*)\n?$", line):
             x = SL()
-            x.indent = len(match.group(1))
-            x.section_level = len(match.group(2))
-            x.inner_text = match.group(3)
+            x.indent = len(match[1])
+            x.section_level = len(match[2])
+            x.inner_text = match[3]
             #print x.indent, x.section_level, x.inner_text
             return x
-        # a line of type '  <content>::<inner_text>'
-        match = re.match(r"(\s*)(.*)::(.*)\n?$", line)
-        if match:
+        if match := re.match(r"(\s*)(.*)::(.*)\n?$", line):
             x = DH()
-            x.indent = len(match.group(1))
-            x.description = match.group(2)
-            x.inner_text = match.group(3)
-            x.text = x.description + "::" + x.inner_text
+            x.indent = len(match[1])
+            x.description = match[2]
+            x.inner_text = match[3]
+            x.text = f"{x.description}::{x.inner_text}"
             return x
-        # a line of type '  * <inner_contet>'
-        match = re.match(r"(\s*)([-\*+]\s*)(\S.*)\n?$", line)
-        if match:
+        if match := re.match(r"(\s*)([-\*+]\s*)(\S.*)\n?$", line):
             x = BH()
-            x.indent = len(match.group(1))
-            x.bullet = match.group(2)
+            x.indent = len(match[1])
+            x.bullet = match[2]
             x.inner_indent = x.indent + len(x.bullet)
-            x.inner_text = match.group(3)
+            x.inner_text = match[3]
             x.text = x.bullet + x.inner_text
             return x
-        # a line of the type  '   <content>'
-        match = re.match(r"(\s*)(\S.*)\n?$", line)
-        if match:
+        if match := re.match(r"(\s*)(\S.*)\n?$", line):
             x = PL()
-            x.indent = len(match.group(1))
-            x.text = match.group(2)
+            x.indent = len(match[1])
+            x.text = match[2]
             return x
 
 # --------------------------------------------------------------------

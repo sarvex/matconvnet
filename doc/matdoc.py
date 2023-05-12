@@ -44,7 +44,7 @@ class MatlabFunction:
         self.body = body
 
     def __str__(self):
-        return "%s (%s)" % (self.name, self.nature)
+        return f"{self.name} ({self.nature})"
 
 # --------------------------------------------------------------------
 def findNextFunction(test, pos):
@@ -52,23 +52,19 @@ def findNextFunction(test, pos):
     if pos == 0 and test[0] == '%':
         # This is an M-file with a MEX implementation
         return (pos, 'function')
-    m = findFunction.search(test, pos)
-    if m:
+    if m := findFunction.search(test, pos):
         return (m.end()+1, m.group(1))
     else:
         return (None, None)
 
 # --------------------------------------------------------------------
 def getFunctionDoc(text, nature, pos):
-# --------------------------------------------------------------------
-    m = getFunction.match(text, pos)
-    if m:
-        name = m.group(1)
-        brief = m.group(2).strip()
-        body = clean(m.group(3))
-        return (MatlabFunction(name, nature, brief, body), m.end()+1)
-    else:
+    if not (m := getFunction.match(text, pos)):
         return (None, pos)
+    name = m.group(1)
+    brief = m.group(2).strip()
+    body = clean(m.group(3))
+    return (MatlabFunction(name, nature, brief, body), m.end()+1)
 
 # --------------------------------------------------------------------
 def clean(text):
